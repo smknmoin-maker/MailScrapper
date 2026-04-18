@@ -18,6 +18,7 @@ MailScrapper is a premium, full-stack web application that allows users to acces
 - **Email Interactions**: Read full HTML emails, reply to threads, and compose new emails directly from the dashboard.
 - **Search Functionality**: Quickly search through your emails using Gmail's search syntax.
 - **Premium UI/UX**: Stunning dark-mode interface with glassmorphism, smooth animations, and responsive design.
+- **High Performance Caching**: Fast data retrieval and indexing powered by Redis.
 
 ---
 
@@ -35,6 +36,7 @@ MailScrapper is a premium, full-stack web application that allows users to acces
 - Googleapis (Gmail API wrapper)
 - Nodemailer (OTP email delivery)
 - JSON Web Tokens (JWT Session Management)
+- Redis (Data caching and indexing)
 
 ---
 
@@ -50,6 +52,7 @@ Before running the application, you need to set up the following credentials:
    - Add `http://localhost:5174` to **Authorized JavaScript origins**.
    - Add `http://localhost:5000/api/auth/google/callback` to **Authorized redirect URIs**.
 3. **Gmail App Password**: Go to your Google Account Security settings, enable 2FA, and generate an App Password for Nodemailer.
+4. **Redis Database**: Create a serverless Redis database on [Upstash](https://upstash.com/) for caching and indexing.
 
 ### 2. Clone the Repository
 ```bash
@@ -74,6 +77,7 @@ JWT_SECRET=your_super_secret_jwt_key
 EMAIL_USER=your_gmail_address@gmail.com
 EMAIL_PASS=your_16_character_app_password
 FRONTEND_URL=http://localhost:5174
+REDIS_URI=your_redis_connection_string
 ```
 
 Start the backend server:
@@ -105,7 +109,7 @@ npm run dev
 3. Set the Root Directory to `backend`.
 4. Build Command: `npm install`
 5. Start Command: `node server.js`
-6. Add all environment variables from your `.env` file. Update `FRONTEND_URL` to your live frontend URL.
+6. Add all environment variables from your `.env` file. Update `FRONTEND_URL` to your live frontend URL, and ensure `REDIS_URI` is added.
 
 ### Frontend (Vercel)
 1. Create a new Project on [Vercel](https://vercel.com/).
