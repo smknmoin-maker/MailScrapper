@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-const API = 'http://localhost:5000/api';
+const API = 'https://mailscrapper.onrender.com/api';
 
 export default function Login() {
   const [loading, setLoading] = useState(false);

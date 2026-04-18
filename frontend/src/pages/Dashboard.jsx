@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
-const API = 'http://localhost:5000/api';
+const API = 'https://mailscrapper.onrender.com/api';
 
 function formatDate(dateStr) {
   if (!dateStr) return '';
