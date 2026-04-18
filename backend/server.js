@@ -7,11 +7,19 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
+const { createClient } = require('redis');
 
 const authRoutes = require('./routes/auth');
 const mailRoutes = require('./routes/mail');
 
 const app = express();
+
+// Initialize Redis
+const redisClient = createClient({
+  url: process.env.REDIS_URI || 'redis://localhost:6379'
+});
+redisClient.on('error', (err) => console.error('Redis Client Error', err));
+redisClient.connect().then(() => console.log('✅ Connected to Redis')).catch(console.error);
 
 // Middleware
 app.use(cors({
@@ -20,6 +28,12 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(cookieParser());
+
+// Inject redis client
+app.use((req, res, next) => {
+  req.redis = redisClient;
+  next();
+});
 
 // Routes
 app.use('/api/auth', authRoutes);

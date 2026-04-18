@@ -84,6 +84,19 @@ router.get('/list', authMiddleware, async (req, res) => {
     const gmail = getGmailClient(req.user);
     const { q = '', pageToken = '', maxResults = 20 } = req.query;
 
+    const cacheKey = `gmail:list:${req.user._id}:${q}:${pageToken}:${maxResults}`;
+
+    if (req.redis) {
+      try {
+        const cached = await req.redis.get(cacheKey);
+        if (cached) {
+          return res.json(JSON.parse(cached));
+        }
+      } catch (err) {
+        console.error('Redis get error:', err);
+      }
+    }
+
     const params = {
       userId: 'me',
       maxResults: parseInt(maxResults),
@@ -129,11 +142,22 @@ router.get('/list', authMiddleware, async (req, res) => {
       })
     );
 
-    res.json({
+    const responseData = {
       emails: emailDetails.filter(Boolean),
       nextPageToken,
       resultSizeEstimate: response.data.resultSizeEstimate
-    });
+    };
+
+    if (req.redis) {
+      try {
+        // Cache for 5 minutes
+        await req.redis.setEx(cacheKey, 300, JSON.stringify(responseData));
+      } catch (err) {
+        console.error('Redis set error:', err);
+      }
+    }
+
+    res.json(responseData);
 
   } catch (error) {
     console.error('List emails error:', error.message);
@@ -145,6 +169,24 @@ router.get('/list', authMiddleware, async (req, res) => {
 router.get('/:id', authMiddleware, async (req, res) => {
   try {
     const gmail = getGmailClient(req.user);
+    const msgId = req.params.id;
+    const cacheKey = `gmail:msg:${req.user._id}:${msgId}`;
+
+    if (req.redis) {
+      try {
+        const cached = await req.redis.get(cacheKey);
+        if (cached) {
+          // Fire and forget mark as read
+          gmail.users.messages.modify({
+            userId: 'me', id: msgId, requestBody: { removeLabelIds: ['UNREAD'] }
+          }).catch(() => {});
+          
+          return res.json(JSON.parse(cached));
+        }
+      } catch (err) {
+        console.error('Redis get msg error:', err);
+      }
+    }
 
     const response = await gmail.users.messages.get({
       userId: 'me',
@@ -168,14 +210,31 @@ router.get('/:id', authMiddleware, async (req, res) => {
       // Ignore if marking as read fails
     }
 
-    res.json({
+    const emailData = {
       id: response.data.id,
       threadId: response.data.threadId,
       snippet: response.data.snippet,
       headers,
       body,
-      labelIds: response.data.labelIds || []
-    });
+      labelIds: (response.data.labelIds || []).filter(l => l !== 'UNREAD')
+    };
+
+    if (req.redis) {
+      try {
+        // Cache individual email for 1 day
+        await req.redis.setEx(cacheKey, 86400, JSON.stringify(emailData));
+        
+        // Also invalidate list caches because an email was read
+        const keys = await req.redis.keys(`gmail:list:${req.user._id}:*`);
+        if (keys.length > 0) {
+          await req.redis.del(keys);
+        }
+      } catch (err) {
+        console.error('Redis cache/invalidate error:', err);
+      }
+    }
+
+    res.json(emailData);
 
   } catch (error) {
     console.error('Get email error:', error.message);
@@ -234,6 +293,18 @@ router.post('/reply/:id', authMiddleware, async (req, res) => {
       }
     });
 
+    if (req.redis) {
+      try {
+        // Invalidate list caches because a new email was sent
+        const keys = await req.redis.keys(`gmail:list:${req.user._id}:*`);
+        if (keys.length > 0) {
+          await req.redis.del(keys);
+        }
+      } catch (err) {
+        console.error('Redis invalidate error:', err);
+      }
+    }
+
     res.json({
       message: 'Reply sent successfully!',
       id: response.data.id
@@ -276,6 +347,18 @@ router.post('/send', authMiddleware, async (req, res) => {
         raw: encodedMessage
       }
     });
+
+    if (req.redis) {
+      try {
+        // Invalidate list caches because a new email was sent
+        const keys = await req.redis.keys(`gmail:list:${req.user._id}:*`);
+        if (keys.length > 0) {
+          await req.redis.del(keys);
+        }
+      } catch (err) {
+        console.error('Redis invalidate error:', err);
+      }
+    }
 
     res.json({
       message: 'Email sent successfully!',
